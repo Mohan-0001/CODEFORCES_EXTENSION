@@ -32,7 +32,7 @@ chrome.runtime.onMessage.addListener(async (message) => {
     const ext = langToExt[message.language] || 'txt';
     const solutionFileName = `Solution.${ext}`;
 
-    const { ghToken, githubRepo, ghUsername } = message.syncData;
+    const { ghToken, githubRepo, ghUsername } = message.syncData;  // githubRepo is now username/repo
 
     try {
       // Push both files in a single commit
