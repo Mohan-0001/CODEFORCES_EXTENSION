@@ -8,7 +8,7 @@ async function startAuth() {
   // If you prefer to keep CLIENT_ID in background.js, you can skip this fetch
   let clientId = "";
   try {
-    const configRes = await fetch('http://localhost:3000/api/config');
+    const configRes = await fetch('https://gittocode.onrender.com/api/config');
     const configData = await configRes.json();
     clientId = configData.clientId;
   } catch (err) {
@@ -39,7 +39,7 @@ async function startAuth() {
       console.log("[AUTH] Sending code to backend for secure exchange...");
 
       // 2. EXCHANGE CODE FOR TOKEN VIA YOUR BACKEND
-      const tokenExchangeResponse = await fetch('http://localhost:3000/api/exchange', {
+      const tokenExchangeResponse = await fetch('https://gittocode.onrender.com/api/exchange', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: code })
