@@ -1,3 +1,42 @@
-chrome.runtime.onMessage.addListener(async n=>{let r=t();if(n.action===`UPDATE_STATUS`)r.innerHTML=`<strong>CF Sync:</strong> ${n.msg}`;else if(n.action===`SYNC_READY`){r.style.borderColor=`#2ecc71`,r.innerHTML=`<strong>✅ Verdict OK!</strong><br>Cleaning & Pushing...`;let t=e(new DOMParser().parseFromString(n.problemHtml,`text/html`).querySelector(`.problem-statement`)),i=n.code,a=`# ${n.problemName}\n\n${t}`,o=`Solution.${{"GNU C++11":`cpp`,"GNU C++14":`cpp`,"GNU C++17":`cpp`,"GNU C++20":`cpp`,"Java 8":`java`,"Java 11":`java`,"Java 17":`java`,"Python 3":`py`,"PyPy 3":`py`}[n.language]||`txt`}`,{ghToken:s,githubRepo:c,ghUsername:l}=n.syncData;try{await chrome.runtime.sendMessage({action:`PUSH_TO_GITHUB`,data:{token:s,repo:c,contestId:n.contestId,problemNo:n.problemNo,files:[{fileName:`README.md`,content:a},{fileName:o,content:i}],message:`Add/Update solution for ${n.problemName} (${n.contestId}${n.problemNo})`,problemName:n.problemName}}),r.innerHTML=`<strong>🚀 Synced!</strong><br>${n.problemName}<br>README.md + ${o} pushed.`}catch(e){r.style.borderColor=`#e74c3c`,r.innerHTML=`<strong>❌ Push failed</strong><br>${e.message||`Unknown error`}`}setTimeout(()=>r.remove(),6e3)}else n.action===`SYNC_FAILED`?(r.style.borderColor=`#e74c3c`,r.innerHTML=`<strong>❌ Verdict: ${n.reason}</strong><br>Sync cancelled.`,setTimeout(()=>r.remove(),5e3)):n.action===`GITHUB_PUSH_SUCCESS`||n.action===`GITHUB_PUSH_FAILED`&&(r.style.borderColor=`#e74c3c`,r.innerHTML=`<strong>❌ GitHub Error</strong><br>${n.error}`,setTimeout(()=>r.remove(),8e3))});function e(e){return e?e.innerText.replace(/\$\$\$/g,``).replace(/\\dots/g,`...`).replace(/\\le/g,`<=`).replace(/\\ge/g,`>=`).replace(/\n{3,}/g,`
+chrome.runtime.onMessage.addListener(async n=>{let r=t();if(n.action===`UPDATE_STATUS`)r.innerHTML=`<strong>CF Sync:</strong> ${n.msg}`;else if(n.action===`SYNC_READY`){r.style.borderColor=`#2ecc71`,r.innerHTML=`<strong>✅ Verdict OK!</strong><br>Cleaning & Pushing...`;let t=new DOMParser().parseFromString(n.problemHtml,`text/html`),i=t.querySelectorAll(`.tag-box`),a=Array.from(i).map(e=>e.innerText.trim()),o=e(t.querySelector(`.problem-statement`),n.problemName,n.performance,a),s=n.code,c=`Solution.${{"GNU C++11":`cpp`,"GNU C++14":`cpp`,"GNU C++17":`cpp`,"GNU C++20":`cpp`,"Java 8":`java`,"Java 11":`java`,"Java 17":`java`,"Python 3":`py`,"PyPy 3":`py`}[n.language]||`txt`}`,{ghToken:l,githubRepo:u}=n.syncData,d=(n.performance.memory/1024).toFixed(0),f=`Solved ${n.problemName} | Time: ${n.performance.time}ms | Memory: ${d}KB | Tags: ${a.join(`, `)}`;try{await chrome.runtime.sendMessage({action:`PUSH_TO_GITHUB`,data:{token:l,repo:u,contestId:n.contestId,problemNo:n.problemNo,files:[{fileName:`README.md`,content:o},{fileName:c,content:s}],message:f,problemName:n.problemName}}),r.innerHTML=`<strong>🚀 Synced!</strong><br>${n.problemName}<br>README.md + ${c} pushed.`}catch(e){r.style.borderColor=`#e74c3c`,r.innerHTML=`<strong>❌ Push failed</strong><br>${e.message||`Unknown error`}`}setTimeout(()=>r.remove(),6e3)}});function e(e,t,n,r){if(!e)return`# ${t}\n\nNo statement found.`;let i=(e,t=``)=>{if(!e)return``;e.querySelectorAll(`.MJX_Assistive_MathML, script, .MathJax_Preview`).forEach(e=>e.remove());let n=e.innerText;if(n=n.replace(/\$\$\$/g,`$`).replace(/\\dots/g,`...`).replace(/\\le/g,`≤`).replace(/\\ge/g,`≥`),t){let e=RegExp(`^${t}`,`i`);n=n.trim().replace(e,``).trim()}return n.trim()},a=e.querySelector(`.time-limit`)?.innerText.replace(`time limit per test`,``).trim()||`2 seconds`,o=e.querySelector(`.memory-limit`)?.innerText.replace(`memory limit per test`,``).trim()||`256 megabytes`,s=i(e.querySelector(`.header + div`)),c=i(e.querySelector(`.input-specification`),`Input`),l=i(e.querySelector(`.output-specification`),`Output`),u=(e.querySelector(`.sample-test .input pre`)?.innerText||``).replace(/\$\$\$/g,`$`).trim(),d=(e.querySelector(`.sample-test .output pre`)?.innerText||``).replace(/\$\$\$/g,`$`).trim(),f=i(e.querySelector(`.note`),`Note`);return`# ${t}
 
-`).replace(/Copy/g,``).trim():`No statement found`}function t(){let e=document.getElementById(`cf-sync-box`);return e||(e=document.createElement(`div`),e.id=`cf-sync-box`,e.style.cssText=`position:fixed; bottom:20px; right:20px; z-index:10000; padding:15px; background:#1e1e1e; color:white; border-radius:8px; border-left:5px solid #f1c40f; font-family:sans-serif; box-shadow:0 4px 15px rgba(0,0,0,0.3); max-width:300px;`,document.body.appendChild(e)),e}
+${r.map(e=>`<img src="https://img.shields.io/badge/-${e.replace(/-/g,`%20`)}-4B5563?style=flat-square" />`).join(` `)}
+
+<div align="center">
+  <strong>Time Limit:</strong> ${a} | <strong>Memory Limit:</strong> ${o}
+</div>
+
+---
+
+### Problem Statement
+${s}
+
+### Input Specification
+${c}
+
+### Output Specification
+${l}
+
+---
+
+### Example
+**Input:**
+\`\`\`text
+${u}
+\`\`\`
+
+**Output:**
+\`\`\`text
+${d}
+\`\`\`
+
+${f?`### Explanation\n${f}\n`:``}
+
+---
+### Submission Info
+* **Time:** ${n.time} ms
+* **Memory:** ${(n.memory/1024).toFixed(0)} KB
+* **Difficulty:** ${n.rating}
+* **Verdict:** AC
+
+*Generated by Code-To-Git Sync Tool*`}function t(){let e=document.getElementById(`cf-sync-box`);return e||(e=document.createElement(`div`),e.id=`cf-sync-box`,e.style.cssText=`position:fixed; bottom:20px; right:20px; z-index:10000; padding:15px; background:#1e1e1e; color:white; border-radius:8px; border-left:5px solid #2ecc71; font-family:sans-serif; box-shadow:0 4px 15px rgba(0,0,0,0.3); max-width:300px;`,document.body.appendChild(e)),e}

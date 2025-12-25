@@ -1,298 +1,3 @@
-// console.log("Background script loaded");
-
-// /* global chrome */
-// const CLIENT_ID = "Ov23liAQQQpfH1gP98nn";
-// const CLIENT_SECRET = "8b0c9ca15cb272a8e6ddbfd8e286c50b6c2f9218";
-
-// // --- 1. THE AUTHENTICATION FLOW ---
-// async function startAuth() {
-//     const redirectURL = chrome.identity.getRedirectURL();
-//     const authUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&scope=repo&redirect_uri=${encodeURIComponent(redirectURL)}`;
-
-//     // Step A: Open the GitHub Login window
-//     chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, async (responseUrl) => {
-//         if (chrome.runtime.lastError || !responseUrl) {
-//             console.error('Auth failed:', chrome.runtime.lastError);
-//             return;
-//         }
-
-//         const url = new URL(responseUrl);
-//         const code = url.searchParams.get("code"); // This is the temporary 'ticket'
-
-//         if (!code) {
-//             console.error('No code received');
-//             return;
-//         }
-
-//         try {
-//             // Step B: Trade the 'code' for a 'token' directly (using client_secret - note: for production, use a secure backend instead)
-//             const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-//                 method: 'POST',
-//                 headers: {
-//                     'Content-Type': 'application/json',
-//                     'Accept': 'application/json'
-//                 },
-//                 body: JSON.stringify({
-//                     client_id: CLIENT_ID,
-//                     client_secret: CLIENT_SECRET,
-//                     code: code,
-//                     redirect_uri: redirectURL
-//                 })
-//             });
-
-//             const data = await tokenResponse.json();
-
-//             if (data.error) {
-//                 console.error('Token exchange error:', data.error_description);
-//                 return;
-//             }
-
-//             const token = data.access_token; // THIS IS YOUR KEY!
-
-//             if (!token) {
-//                 console.error('No token received');
-//                 return;
-//             }
-
-//             // Step C: Get user's GitHub Name/Email automatically
-//             const userRes = await fetch("https://api.github.com/user", {
-//                 headers: { Authorization: `Bearer ${token}` }
-//             });
-//             const userData = await userRes.json();
-//             console.log(userData);
-
-//             // Save everything for later
-//             await chrome.storage.sync.set({
-//                 ghToken: token,
-//                 ghUsername: userData.login,
-//                 ghEmail: userData.email || `${userData.login}@users.noreply.github.com`
-//             });
-
-//             console.log("Authentication Successful!");
-//         } catch (err) {
-//             console.error('Auth error:', err);
-//         }
-//     });
-// }
-
-// // --- 2. THE PUSH FLOW ---
-// async function pushFileToGitHub(fileName, fileContent, contestId) {
-//     const { ghToken, ghUsername, ghEmail } = await chrome.storage.sync.get(['ghToken', 'ghUsername', 'ghEmail']);
-//     if (!ghToken || !ghUsername) {
-//         console.error('GitHub credentials not found');
-//         return;
-//     }
-
-//     const repoName = "Codeforces-Solutions";
-//     const path = `Contest_${contestId}/${fileName}`;
-
-//     // GitHub API requires content in Base64
-//     const base64Content = btoa(unescape(encodeURIComponent(fileContent)));
-
-//     // API URL to create/update a file
-//     const url = `https://api.github.com/repos/${ghUsername}/${repoName}/contents/${path}`;
-
-//     const body = {
-//         message: `Solved ${fileName} on Codeforces`,
-//         content: base64Content,
-//         // THIS PART makes it commit as 'Them'
-//         committer: {
-//             name: ghUsername,
-//             email: ghEmail
-//         }
-//     };
-
-//     try {
-//         const response = await fetch(url, {
-//             method: "PUT",
-//             headers: {
-//                 "Authorization": `Bearer ${ghToken}`,
-//                 "Content-Type": "application/json"
-//             },
-//             body: JSON.stringify(body)
-//         });
-
-//         if (response.ok) {
-//             console.log("File pushed successfully as " + ghUsername);
-//         } else {
-//             console.error('Push failed:', response.status, await response.text());
-//         }
-//     } catch (err) {
-//         console.error('Push error:', err);
-//     }
-// }
-
-// // Listen for messages from popup or content script
-// chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-//     if (request.action === 'startAuth') {
-//         startAuth();
-//         sendResponse({ success: true });
-//     } else if (request.action === 'pushFile') {
-//         pushFileToGitHub(request.fileName, request.fileContent, request.contestId);
-//         sendResponse({ success: true });
-//     }
-//     return true; // Keep the message channel open for async responses if needed
-// });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// let pendingSubmissions = {};
-
-// // 1. Intercept the POST request to get the code
-// chrome.webRequest.onBeforeRequest.addListener(
-//     async (details) => {
-//         if (details.method === "POST" && details.requestBody.formData) {
-//             const formData = details.requestBody.formData;
-//             const code = formData.sourceCode?.[0] || formData.source?.[0];
-            
-//             if (code) {
-//                 pendingSubmissions[details.requestId] = {
-//                     code: code,
-//                     problemId: formData.submittedProblemIndex?.[0]
-//                 };
-//                 console.log(pendingSubmissions, pendingSubmissions[details.requestId]);
-//             }
-//         }
-//     },
-//     { urls: ["*://codeforces.com/problemset/submit*", "*://codeforces.com/contest/*/submit*"] },
-//     ["requestBody"]
-// );
-
-// // 2. Check for 302 Redirect (Confirms form was valid)
-// chrome.webRequest.onHeadersReceived.addListener(
-//     (details) => {
-//         const requestId = details.requestId;
-//         if (!pendingSubmissions[requestId]) return;
-
-//         const isRedirect = details.statusCode >= 300 && details.statusCode < 400;
-
-//         if (isRedirect) {
-//             console.log("Submission accepted by server. Starting Watchdog...");
-//             startWatchdog(details.tabId, pendingSubmissions[requestId]);
-//         }
-//         delete pendingSubmissions[requestId]; 
-//     },
-//     { urls: ["*://codeforces.com/problemset/submit*", "*://codeforces.com/contest/*/submit*"] }
-// );
-
-// // 3. The Watchdog: Polls CF API for the verdict
-// async function startWatchdog(tabId, subData) {
-//     const { codeforcesUsername, githubRepo } = await chrome.storage.sync.get(["codeforcesUsername", "githubRepo"]);
-//     const handle = codeforcesUsername || "Hacker_bot";
-
-    
-
-//     chrome.tabs.sendMessage(tabId, { action: "UPDATE_STATUS", msg: "Verifying submission..." });
-
-//     const pollInterval = setInterval(async () => {
-//         try {
-//             const response = await fetch(`https://codeforces.com/api/user.status?handle=${handle}&from=1&count=1`);
-//             const result = await response.json();
-
-//             if (result.status === "OK" && result.result.length > 0) {
-//                 const latest = result.result[0];
-//                 console.log(result);
-//                 console.log("Latest submission verdict:", latest.verdict);
-
-//                 if (latest.verdict === "TESTING" || latest.verdict === null) return;
-
-//                 clearInterval(pollInterval);
-
-//                 if (latest.verdict === "OK") {
-//                     console.log(result);
-//                 console.log("Latest submission verdict:", latest.verdict);
-//                     // Fetch Problem Page to get statement
-//                     const problemUrl = `https://codeforces.com/contest/${latest.contestId}/problem/${latest.problem.index}`;
-//                     const pageResp = await fetch(problemUrl);
-//                     const html = await pageResp.text();
-//                     console.log(latest, html)
-
-//                     // get the local storage
-//                     const syncData = await chrome.storage.sync.get(["ghToken","githubRepo" , "ghUsername"]);
-//                     console.log("SYNC DATA", syncData);
-
-//                     chrome.tabs.sendMessage(tabId, { 
-//                         action: "SYNC_READY", 
-//                         code: subData.code,
-//                         problemHtml: html,
-//                         problemName: latest.problem.name,
-//                         path: `${githubRepo}/${latest.contestId}/${latest.problem.index}`,
-//                         syncData: syncData
-//                     });
-//                 } else {
-//                     chrome.tabs.sendMessage(tabId, { action: "SYNC_FAILED", reason: latest.verdict });
-//                 }
-//             }
-//         } catch (err) {
-//             clearInterval(pollInterval);
-//         }
-//     }, 3000);
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 console.log("Background script loaded");
 
 /* global chrome */
@@ -431,13 +136,13 @@ async function createRepoIfNotExists(token, repoFullName) {
 }
 
 // --- 3. GITHUB PUSH LOGIC ---
-async function uploadFilesToGitHub(token, repoFullName, contestId, problemNo, files, commitMessage) {
+async function uploadFilesToGitHub(token, repoFullName, contestId, problemNo, files, commitMessage, problemName) {
   console.log(`[PUSH] Starting push to ${repoFullName}`);
   console.log(`[PUSH] Contest: ${contestId}, Problem: ${problemNo}`);
   console.log(`[PUSH] Files:`, files.map(f => f.fileName).join(', '));
   console.log(`[PUSH] Commit message: ${commitMessage}`);
 
-  const basePath = `${contestId}/${problemNo}/`;
+  const basePath = `${contestId}/${problemNo} - ${problemName}/`;
   console.log(`[PUSH] Target folder path: ${basePath}`);
 
   const headers = {
@@ -540,10 +245,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "PUSH_TO_GITHUB") {
     console.log("[MESSAGE] PUSH_TO_GITHUB request received");
 
-    const { token, repo, contestId, problemNo, files, message } = request.data;
+    const { token, repo, contestId, problemNo, files, message, problemName } = request.data;
     console.log("[MESSAGE] Push data:", { repo, contestId, problemNo, fileCount: files.length });
 
-    uploadFilesToGitHub(token, repo, contestId, problemNo, files, message)
+    uploadFilesToGitHub(token, repo, contestId, problemNo, files, message, problemName)
       .then(() => {
         console.log("[PUSH] Push completed successfully");
         chrome.tabs.sendMessage(sender.tab.id, {
@@ -566,117 +271,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 
-
-// let pendingSubmissions = {};
-
-// chrome.webRequest.onBeforeRequest.addListener(
-//   (details) => {
-//     if (details.method === "POST" && details.requestBody?.formData) {
-//       const formData = details.requestBody.formData;
-//       const code = formData.sourceCode?.[0] || formData.source?.[0];
-//       console.log(details);
-
-//       if (code) {
-//         pendingSubmissions[details.requestId] = {
-//           code,
-//           problemId: formData.submittedProblemIndex?.[0]
-//         };
-//       }
-//     }
-//   },
-//   { urls: ["*://codeforces.com/problemset/submit*", "*://codeforces.com/contest/*/submit*"] },
-//   ["requestBody"]
-// );
-
-// chrome.webRequest.onHeadersReceived.addListener(
-//   (details) => {
-//     const requestId = details.requestId;
-//     if (!pendingSubmissions[requestId]) return;
-
-//     const isRedirect = details.statusCode >= 300 && details.statusCode < 400;
-//     if (isRedirect) {
-//       startWatchdog(details.tabId, pendingSubmissions[requestId]);
-//     }
-//     console.log(details);
-//     delete pendingSubmissions[requestId];
-//   },
-//   { urls: ["*://codeforces.com/problemset/submit*", "*://codeforces.com/contest/*/submit*"] }
-// );
-
-// async function startWatchdog(tabId, subData) {
-//   const { codeforcesUsername, githubRepo } = await chrome.storage.sync.get(["codeforcesUsername", "githubRepo"]);
-//   const handle = codeforcesUsername || "Hacker_bot";
-
-//   chrome.tabs.sendMessage(tabId, { action: "UPDATE_STATUS", msg: "Waiting for verdict..." });
-
-//   const pollInterval = setInterval(async () => {
-//     try {
-//       const response = await fetch(`https://codeforces.com/api/user.status?handle=${handle}&from=1&count=1`);
-//       const result = await response.json();
-
-//       if (result.status !== "OK" || result.result.length === 0) return;
-
-//       const latest = result.result[0];
-
-//       if (latest.verdict === "TESTING") return;
-
-//       clearInterval(pollInterval);
-
-//       if (latest.verdict === "OK") {
-//         const problemUrl = `https://codeforces.com/contest/${latest.contestId}/problem/${latest.problem.index}`;
-//         const pageResp = await fetch(problemUrl);
-//         const html = await pageResp.text();
-
-//         const syncData = await chrome.storage.sync.get(["ghToken", "githubRepo", "ghUsername"]);
-
-//         chrome.tabs.sendMessage(tabId, {
-//           action: "SYNC_READY",
-//           code: subData.code,
-//           problemHtml: html,
-//           problemName: latest.problem.name,
-//           contestId: latest.contestId,
-//           problemNo: latest.problem.index,
-//           language: latest.programmingLanguage,
-//           syncData: syncData
-//         });
-//       } else {
-//         chrome.tabs.sendMessage(tabId, { action: "SYNC_FAILED", reason: latest.verdict });
-//       }
-//     } catch (err) {
-//       clearInterval(pollInterval);
-//       chrome.tabs.sendMessage(tabId, { action: "SYNC_FAILED", reason: "Network error" });
-//     }
-//   }, 3000);
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// background.js
-
-// Add this at the very top to confirm the script is running
+// script starts here
 console.log("CFPusher background service worker loaded");
 
-// Store pending submissions temporarily
-const pendingSubmissions = {};
+const pendingSubmissions = new Map();
 
 // Listener 1: Capture the submitted code before the POST request
 chrome.webRequest.onBeforeRequest.addListener(
@@ -689,11 +287,11 @@ chrome.webRequest.onBeforeRequest.addListener(
     const code = formData.sourceCode?.[0] || formData.source?.[0];
 
     if (code) {
-      pendingSubmissions[details.requestId] = {
+      pendingSubmissions.set(details.requestId, {
         code,
         problemId: formData.submittedProblemIndex?.[0] || formData.problemIndex?.[0],
-      };
-      console.log("Captured submission:", details.requestId, "Problem ID:", pendingSubmissions[details.requestId].problemId);
+      });
+      console.log("Captured submission:", details.requestId, "Problem ID:", pendingSubmissions.get(details.requestId).problemId);
     }
   },
   {
@@ -709,7 +307,7 @@ chrome.webRequest.onBeforeRequest.addListener(
 chrome.webRequest.onHeadersReceived.addListener(
   (details) => {
     const requestId = details.requestId;
-    const submission = pendingSubmissions[requestId];
+    const submission = pendingSubmissions.get(requestId);
 
     if (!submission) return;
 
@@ -722,7 +320,7 @@ chrome.webRequest.onHeadersReceived.addListener(
     }
 
     // Clean up
-    delete pendingSubmissions[requestId];
+    pendingSubmissions.delete(requestId);
   },
   {
     urls: [
@@ -760,26 +358,31 @@ async function startWatchdog(tabId, subData) {
       clearInterval(pollInterval);
 
       if (latest.verdict === "OK") {
+        console.log(latest);
         const problemUrl = `https://codeforces.com/contest/${latest.contestId}/problem/${latest.problem.index}`;
         const pageResp = await fetch(problemUrl);
         const html = await pageResp.text();
+        console.log(html);
 
         const syncData = await chrome.storage.sync.get(["ghToken", "ghUsername", "githubRepo"]);
 
         chrome.tabs.sendMessage(tabId, {
-          action: "SYNC_READY",
-          code: subData.code,
-          problemHtml: html,
-          problemName: latest.problem.name,
-          contestId: latest.contestId,
-          problemNo: latest.problem.index,
-          language: latest.programmingLanguage,
-          syncData,
-        });
-      } else {
-        chrome.tabs.sendMessage(tabId, {
-          action: "SYNC_FAILED",
-          reason: latest.verdict || "UNKNOWN",
+        action: "SYNC_READY",
+        code: subData.code,
+        problemHtml: html,
+        problemName: latest.problem.name,
+        contestId: latest.contestId,
+        problemNo: latest.problem.index,
+        language: latest.programmingLanguage,
+        // --- PERFORMANCE METRICS ---
+        performance: {
+            time: latest.timeConsumedMillis,
+            memory: latest.memoryConsumedBytes,
+            testCases: latest.passedTestCount,
+            submissionId: latest.id,
+            rating: latest.problem.rating || "Unrated"
+        },
+        syncData,
         });
       }
     } catch (err) {
