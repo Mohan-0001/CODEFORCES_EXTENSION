@@ -1,19 +1,37 @@
 /* global chrome */
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 
 const GitHubConnect = ({ isDark, onSuccess, onBack }) => {
   const [isAuthorizing, setIsAuthorizing] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    // Listen for the background script to say it's actually done
+    const listener = (message) => {
+      if (message.action === 'AUTH_FINISHED') {
+        if (message.success) {
+          setIsAuthorizing(false)
+          onSuccess() // Now it moves to repo selection ONLY when done
+        } else {
+          setError('Authentication failed during token exchange.')
+          setIsAuthorizing(false)
+        }
+      }
+    }
+
+    chrome.runtime.onMessage.addListener(listener)
+    return () => chrome.runtime.onMessage.removeListener(listener)
+  }, [onSuccess])
+
   const handleGitHubAuth = () => {
     setError('')
-
+    
+    // We only set loading state here. onSuccess is NOT called yet.
     chrome.runtime.sendMessage({ action: 'startAuth' }, (response) => {
       if (response?.success) {
         setIsAuthorizing(true)
-        onSuccess()
       } else {
-        setError('GitHub authorization failed. Please try again.')
+        setError('Could not start authorization.')
         setIsAuthorizing(false)
       }
     })
@@ -49,12 +67,18 @@ const GitHubConnect = ({ isDark, onSuccess, onBack }) => {
           disabled={isAuthorizing}
           className="w-full py-3 bg-gray-900 hover:bg-black disabled:opacity-60 text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
         >
-          {isAuthorizing ? 'Authorizing...' : 'Authorize with GitHub'}
+          {isAuthorizing ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              Authorizing...
+            </>
+          ) : 'Authorize with GitHub'}
         </button>
 
         <button
           onClick={onBack}
-          className="text-sm text-blue-600 hover:underline"
+          disabled={isAuthorizing}
+          className="text-sm text-blue-600 hover:underline disabled:text-gray-400"
         >
           ← Back to Codeforces setup
         </button>

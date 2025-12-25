@@ -1,87 +1,80 @@
 console.log("Background script loaded");
 
-/* global chrome */
-const CLIENT_ID = "Ov23liAQQQpfH1gP98nn";
-const CLIENT_SECRET = "8b0c9ca15cb272a8e6ddbfd8e286c50b6c2f9218";
-
 // --- 1. AUTHENTICATION FLOW ---
 async function startAuth() {
-  console.log("[AUTH] Starting GitHub authentication...");
+  console.log("[AUTH] Starting Secure GitHub authentication...");
+
+  // 1. Fetch the Client ID from your server (keeps it dynamic)
+  // If you prefer to keep CLIENT_ID in background.js, you can skip this fetch
+  let clientId = "";
+  try {
+    const configRes = await fetch('http://localhost:3000/api/config');
+    const configData = await configRes.json();
+    clientId = configData.clientId;
+  } catch (err) {
+    console.error("[AUTH] Could not fetch config from server:", err);
+    return;
+  }
 
   const redirectURL = chrome.identity.getRedirectURL();
-  console.log("[AUTH] Redirect URL:", redirectURL);
+  const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo&redirect_uri=${encodeURIComponent(redirectURL)}`;
 
-  const authUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&scope=repo&redirect_uri=${encodeURIComponent(redirectURL)}`;
-  console.log("[AUTH] Launching auth URL:", authUrl);
+  console.log("[AUTH] Launching auth flow...");
 
   chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, async (responseUrl) => {
     if (chrome.runtime.lastError || !responseUrl) {
-      console.error('[AUTH] Auth failed:', chrome.runtime.lastError?.message || 'No response URL');
+      console.error('[AUTH] Auth failed:', chrome.runtime.lastError?.message);
       return;
     }
-
-    console.log("[AUTH] Received redirect URL:", responseUrl);
 
     const url = new URL(responseUrl);
     const code = url.searchParams.get("code");
 
     if (!code) {
-      console.error('[AUTH] No authorization code found in redirect URL');
+      console.error('[AUTH] No code found');
       return;
     }
 
-    console.log("[AUTH] Authorization code received:", code.substring(0, 10) + "...");
-
     try {
-      console.log("[AUTH] Exchanging code for token...");
-      const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+      console.log("[AUTH] Sending code to backend for secure exchange...");
+
+      // 2. EXCHANGE CODE FOR TOKEN VIA YOUR BACKEND
+      const tokenExchangeResponse = await fetch('http://localhost:3000/api/exchange', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          client_id: CLIENT_ID,
-          client_secret: CLIENT_SECRET,
-          code: code,
-          redirect_uri: redirectURL
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code })
       });
 
-      const data = await tokenResponse.json();
-      console.log("[AUTH] Token exchange response:", data);
+      const data = await tokenExchangeResponse.json();
 
-      if (data.error) {
-        console.error('[AUTH] Token exchange error:', data.error_description || data.error);
+      if (data.error || !data.access_token) {
+        console.error('[AUTH] Backend token exchange failed:', data.error);
         return;
       }
 
       const token = data.access_token;
+      console.log("[AUTH] Token received from backend!");
 
-      if (!token) {
-        console.error('[AUTH] No access token received');
-        return;
-      }
-
-      console.log("[AUTH] Access token received (length):", token.length);
-
-      // Get user info
-      console.log("[AUTH] Fetching GitHub user info...");
+      // 3. Get user info from GitHub using the token
       const userRes = await fetch("https://api.github.com/user", {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `token ${token}` }
       });
       const userData = await userRes.json();
-      console.log("[AUTH] GitHub user:", userData.login, userData.email || '(no email)');
 
+      // 4. Save to storage
       await chrome.storage.sync.set({
         ghToken: token,
         ghUsername: userData.login,
         ghEmail: userData.email || `${userData.login}@users.noreply.github.com`
       });
 
-      console.log("GitHub authentication successful! Saved token and username.");
+      // ADD THIS: Notify the popup that auth is COMPLETE
+      chrome.runtime.sendMessage({ action: 'AUTH_FINISHED', success: true });
+
+      console.log(`Successfully authenticated as ${userData.login}`);
+
     } catch (err) {
-      console.error('[AUTH] Unexpected error during auth:', err);
+      console.error('[AUTH] Error during backend communication:', err);
     }
   });
 }
@@ -367,22 +360,22 @@ async function startWatchdog(tabId, subData) {
         const syncData = await chrome.storage.sync.get(["ghToken", "ghUsername", "githubRepo"]);
 
         chrome.tabs.sendMessage(tabId, {
-        action: "SYNC_READY",
-        code: subData.code,
-        problemHtml: html,
-        problemName: latest.problem.name,
-        contestId: latest.contestId,
-        problemNo: latest.problem.index,
-        language: latest.programmingLanguage,
-        // --- PERFORMANCE METRICS ---
-        performance: {
+          action: "SYNC_READY",
+          code: subData.code,
+          problemHtml: html,
+          problemName: latest.problem.name,
+          contestId: latest.contestId,
+          problemNo: latest.problem.index,
+          language: latest.programmingLanguage,
+          // --- PERFORMANCE METRICS ---
+          performance: {
             time: latest.timeConsumedMillis,
             memory: latest.memoryConsumedBytes,
             testCases: latest.passedTestCount,
             submissionId: latest.id,
             rating: latest.problem.rating || "Unrated"
-        },
-        syncData,
+          },
+          syncData,
         });
       }
     } catch (err) {

@@ -3,7 +3,7 @@ chrome.runtime.onMessage.addListener(async (message) => {
 
     if (message.action === "UPDATE_STATUS") {
         box.innerHTML = `<strong>CF Sync:</strong> ${message.msg}`;
-    }
+    } 
     else if (message.action === "SYNC_READY") {
         box.style.borderColor = "#2ecc71";
         box.innerHTML = `<strong>✅ Verdict OK!</strong><br>Cleaning & Pushing...`;
